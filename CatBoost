@@ -1,0 +1,52 @@
+# CATBOOST
+import pandas as pd
+import numpy as np
+from catboost import CatBoostRegressor, Pool
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error,r2_score
+from sklearn.preprocessing import StandardScaler
+# 🔹 Load the dataset
+data = pd.read_csv("/content/drive/MyDrive/used car/encoded_dataset (1).csv") # Replace with your
+# 🔹 Define target column
+target_column = "sale_price"
+# 🔹 Separate features and target
+X = data.drop(columns=[target_column])
+
+y = data[target_column]
+# 🔹 Identify categorical features (CatBoost handles them automatically)
+categorical_features = X.select_dtypes(include=['object']).columns.tolist()
+# 🔹 Convert categorical columns to strings (CatBoost needs this)
+X[categorical_features] = X[categorical_features].astype(str)
+# 🔹 Split the dataset
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,random_state=42)
+# 🔹 Initialize CatBoost Regressor
+cat_model = CatBoostRegressor(iterations=1000, # More iterations for better learning
+learning_rate=0.05,
+depth=8,
+loss_function='RMSE', # Root Mean Squared Error as loss
+cat_features=categorical_features, # Automatically handles
+verbose=100,
+random_seed=42
+)
+# 🔹 Train the model
+cat_model.fit(X_train, y_train, eval_set=(X_test, y_test),
+early_stopping_rounds=100, use_best_model=True)
+# 🔹 Predict on test set
+y_pred = cat_model.predict(X_test)
+# 🔹 Evaluate model performance
+mse = mean_squared_error(y_test, y_pred)
+mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
+print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
+
+print(f"✅ R2 Score: {r2:.2f}") # Should be positive if the model is performing well
+# 🔹 Plot feature importance
+import matplotlib.pyplot as plt
+feature_importances = cat_model.get_feature_importance()
+plt.figure(figsize=(10, 6))
+plt.barh(X.columns, feature_importances, color='teal')
+plt.xlabel("Feature Importance")
+plt.ylabel("Features")
+plt.title("CatBoost Feature Importance")
+plt.show()
