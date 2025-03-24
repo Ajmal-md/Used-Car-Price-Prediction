@@ -1,0 +1,89 @@
+# TABNET
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from pytorch_tabnet.tab_model import TabNetRegressor
+import torch
+
+# ----------- Load Dataset -----------
+# Load the dataset (update path if needed)
+data = pd.read_csv("/content/drive/MyDrive/used car/encoded_dataset (1).csv")
+
+# ----------- Define Target Column -----------
+target_column = "sale_price"
+
+# ----------- Split Features and Target -----------
+# Define features and target
+X = data.drop(columns=[target_column])  # Features
+y = data[target_column]  # Target variable
+
+# ----------- Handle Categorical Columns -----------
+# Identify categorical features
+categorical_features = X.select_dtypes(include=['object']).columns.tolist()
+
+# Encode categorical features using one-hot encoding
+X = pd.get_dummies(X, columns=categorical_features, drop_first=True)
+
+# ----------- Train-Test Split -----------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# ----------- Normalize Data (Optional) -----------
+# Standardize data for TabNet
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# ----------- Initialize TabNet Regressor -----------
+tabnet_model = TabNetRegressor(
+    n_d=8,  # Dimensionality of decision prediction layer
+    n_a=8,  # Dimensionality of attention layer
+    n_steps=5,  # Number of decision steps
+    gamma=1.5,  # Relaxation factor for sparsity
+    lambda_sparse=1e-4,  # Strength of the sparsity regularization
+    optimizer_fn=torch.optim.Adam,  # Optimizer
+    optimizer_params=dict(lr=2e-2),  # Learning rate
+    mask_type="entmax"  # Alternative: 'sparsemax'
+)
+
+# ----------- Train the Model -----------
+tabnet_model.fit(
+    X_train_scaled, y_train.values.reshape(-1, 1),
+    eval_set=[(X_test_scaled, y_test.values.reshape(-1, 1))],
+    eval_name=["val"],
+    eval_metric=["rmse"],
+    max_epochs=200,  # Increase epochs for better learning
+    patience=30,  # Early stopping patience
+    batch_size=1024,
+    virtual_batch_size=128,
+    num_workers=0,
+    drop_last=False
+)
+
+# ----------- Predict on Test Set -----------
+y_pred = tabnet_model.predict(X_test_scaled).flatten()
+
+# ----------- Evaluate Model Performance -----------
+mse = mean_squared_error(y_test, y_pred)
+mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
+print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
+print(f"✅ R2 Score: {r2:.2f}")
+
+# ----------- Plot Feature Importance -----------
+# Get feature importance
+feature_importances = tabnet_model.feature_importances_
+
+# Plot feature importance
+plt.figure(figsize=(10, 6))
+plt.barh(X.columns, feature_importances, color='teal')
+plt.xlabel("Feature Importance")
+plt.ylabel("Features")
+plt.title("TabNet Feature Importance")
+plt.show()
