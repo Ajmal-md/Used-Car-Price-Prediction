@@ -1,0 +1,105 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+
+# ----------- Load Dataset -----------
+data = pd.read_csv("/content/encoded_dataset.csv")  # Update with correct path
+
+# Define target column
+target_column = "sale_price"
+
+# Split features (X) and target (y)
+X = data.drop(columns=[target_column])
+y = data[target_column]
+
+# ----------- Train-Test Split -----------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# ----------- Normalize Features -----------
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# ----------- Model 1: ANN (Artificial Neural Network) -----------
+def build_ann():
+    model = Sequential([
+        Dense(128, activation='relu', input_shape=(X_train_scaled.shape[1],)),
+        Dropout(0.3),
+        Dense(64, activation='relu'),
+        Dropout(0.2),
+        Dense(1, activation='linear')
+    ])
+    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    return model
+
+
+# ----------- Model 2: MLP (Multi-Layer Perceptron) -----------
+def build_mlp():
+    model = Sequential([
+        Dense(64, activation='relu', input_shape=(X_train_scaled.shape[1],)),
+        Dense(32, activation='relu'),
+        Dropout(0.2),
+        Dense(1, activation='linear')
+    ])
+    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    return model
+
+
+# ----------- Model 3: Basic Neural Network (NN) -----------
+def build_nn():
+    model = Sequential([
+        Dense(256, activation='relu', input_shape=(X_train_scaled.shape[1],)),
+        Dense(128, activation='relu'),
+        Dropout(0.3),
+        Dense(64, activation='relu'),
+        Dense(1, activation='linear')
+    ])
+    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    return model
+
+
+# ----------- Create and Train Models -----------
+ann_model = build_ann()
+mlp_model = build_mlp()
+nn_model = build_nn()
+
+print("\n🔄 Training ANN Model...")
+ann_model.fit(X_train_scaled, y_train, epochs=50, batch_size=32, verbose=1)
+
+print("\n🔄 Training MLP Model...")
+mlp_model.fit(X_train_scaled, y_train, epochs=50, batch_size=32, verbose=1)
+
+print("\n🔄 Training NN Model...")
+nn_model.fit(X_train_scaled, y_train, epochs=50, batch_size=32, verbose=1)
+
+# ----------- Make Predictions -----------
+ann_preds = ann_model.predict(X_test_scaled).flatten()
+mlp_preds = mlp_model.predict(X_test_scaled).flatten()
+nn_preds = nn_model.predict(X_test_scaled).flatten()
+
+# ----------- Ensemble the Predictions -----------
+ensemble_preds = (ann_preds + mlp_preds + nn_preds) / 3
+
+# ----------- Evaluate Ensemble Model -----------
+mse = mean_squared_error(y_test, ensemble_preds)
+rmse = np.sqrt(mse)
+mae = mean_absolute_error(y_test, ensemble_preds)
+r2 = r2_score(y_test, ensemble_preds)
+
+print("\n✅ Model Evaluation:")
+print(f"RMSE: {rmse:.2f}")
+print(f"MSE: {mse:.2f}")
+print(f"MAE: {mae:.2f}")
+print(f"R² Score: {r2:.4f}")
+
+# ----------- Display Sample Predictions -----------
+print("\n🚗 Sample Predictions:")
+print("Actual:", y_test.values[:5])
+print("Predicted:", ensemble_preds[:5])
